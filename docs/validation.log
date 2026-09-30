@@ -1,0 +1,37 @@
+ANIX release validation — 2026-10-01 Asia/Dhaka
+Toolchain: GNU Make 4.3, Zig 0.16.0 cc, Python 3.11, Z3 5.1.0.0
+
+$ .tools/make.exe clean
+python tools/check.py clean
+Exit status: 0
+
+$ .tools/make.exe build "CC=.tools/ziglang/zig.exe cc"
+python tools/check.py build --cc ".tools/ziglang/zig.exe cc"
++ .tools/ziglang/zig.exe cc -std=c99 -ffreestanding -Wall -Wextra -Werror -pedantic -O2 -Iinclude -c src/anix.c -o build/anix.o
+Exit status: 0
+
+$ .tools/make.exe test "CC=.tools/ziglang/zig.exe cc"
+python tools/check.py test --cc ".tools/ziglang/zig.exe cc"
++ .tools/ziglang/zig.exe cc -std=c99 -ffreestanding -Wall -Wextra -Werror -pedantic -O2 -Iinclude -c src/anix.c -o build/anix.o
++ .tools/ziglang/zig.exe cc -std=c99 -ffreestanding -Wall -Wextra -Werror -pedantic -O2 -Iinclude -Ibuild src/anix.c tests/test_runtime.c -o build/test_runtime.exe
++ build/test_runtime.exe
+PASS: graph decisions, shadow outliers, truncations, CRC, cycle rejection, output preservation, dual-bank swaps
++ python -m unittest discover -s tests -p test_*.py -v
+test_constant_policy (test_compiler.CompilerTests.test_constant_policy) ... ok
+test_deterministic (test_compiler.CompilerTests.test_deterministic) ... ok
+test_maximum_and_oversize (test_compiler.CompilerTests.test_maximum_and_oversize) ... ok
+test_rejections (test_compiler.CompilerTests.test_rejections) ... ok
+test_wire (test_compiler.CompilerTests.test_wire) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.167s
+
+OK
++ .tools/ziglang/zig.exe cc -std=c99 -ffreestanding -Wall -Wextra -Werror -pedantic -O2 -Iinclude -Ibuild src/anix.c tests/benchmark.c -o build/benchmark.exe
++ build/benchmark.exe
+Validated execute: 0.540 us/call (100000 calls, host CPU clock); action=10
+All checks passed; C compiler emitted zero warnings.
+Exit status: 0
+
+Runtime hot-swap synchronization is supplied by platform critical-section hooks.
+Host tests use serialization assertions; no MCU concurrency or WCET was measured.

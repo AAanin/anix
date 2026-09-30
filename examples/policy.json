@@ -1,0 +1,1 @@
+{"policy_id":1,"entry":0,"inputs":[[0,100]],"safe_actions":[10,20,99],"nodes":[{"kind":"decision","input":0,"threshold":50,"lower":0,"upper":100,"yes":1,"no":2,"shadow":3},{"kind":"action","action":10},{"kind":"action","action":20},{"kind":"action","action":99}]}
