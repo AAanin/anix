@@ -1,44 +1,69 @@
 # ANIX Engine
 
+[![C99 Freestanding](https://img.shields.io/badge/C99-Freestanding-00599C?style=flat-square)](#binary-abi-v1)
+[![Z3 Verified](https://img.shields.io/badge/Z3-Verified-7B42BC?style=flat-square)](#formal-verification-scope)
+[![Sub-microsecond Latency: 0.530us](https://img.shields.io/badge/Sub--microsecond_Latency-0.530us-00875A?style=flat-square)](#benchmark-and-verification)
+[![License: PolyForm Noncommercial](https://img.shields.io/badge/License-PolyForm_Noncommercial-34495E?style=flat-square)](#licensing)
+
+**ANIX is a high-integrity execution engine for autonomous edge systems, turning verified decision policies into bounded, deterministic actions.** It combines compile-time SMT checks with a freestanding C99 runtime that reads immutable policy graphs directly from memory and routes sensor outliers through explicit shadow recovery paths.
+
 **Asynchronous Non-blocking Invariant eXecution Engine**, formerly DSNE.
 Copyright © 2026 Royalx LLC / Mahamodul Anin.
 
-ANIX evaluates immutable, relative-offset decision DAGs directly from caller-owned
-memory. The freestanding ISO C99 core uses no allocation, recursion, floating point,
-or libc calls. Every decision carries an explicit deterministic shadow edge.
+The latency badge reports a measured mean for the four-node host fixture; Z3
+verification covers the policy properties described below. ANIX is
+**source-available under PolyForm Noncommercial**, with separate commercial
+licensing. Platform synchronization determines execution blocking behavior.
+
+## Key Pillars: Why ANIX?
+
+| Pillar | Engineering value | Evidence and boundary |
+|---|---|---|
+| **Sub-Microsecond Execution** | Compact decision graphs support fast policy evaluation with predictable traversal bounds. | **0.530 µs/call** observed host mean, including CRC and full blob validation. Target deadlines require target measurements. |
+| **Mathematical Provability (SMT Z3)** | Prove terminal reachability, absence of dead ends, and preservation of a declared safe-action set across every uint32 sensor valuation. | Checks include shadow paths; the C implementation and physical system are outside the SMT proof. |
+| **Zero-Dynamic Allocation** | Zero malloc/heap use in the runtime, no recursion or floating-point operations, and constant auxiliary memory. | The core executes directly from caller-owned bytes with bounded relative offsets; no graph copy or libc calls. |
+| **Zero-Downtime Dual-Bank Hot-Swapping** | Publish a validated replacement policy without rebooting the device or copying its payload. | Platform critical-section hooks serialize publication and readers; execution may pause during the bounded critical section. |
+
+## Architecture: From Verified Policy to Deterministic Action
+
+Compilation establishes policy properties before deployment. The runtime checks
+wire integrity and memory bounds on each call, then follows strictly advancing
+edges to a terminal action.
 
 ```mermaid
 flowchart TD
-  subgraph Compile["Policy Compilation"]
+  subgraph Compile["1. Compilation and Formal SMT Verification"]
     direction TB
-    G["JSON policy and sensor contracts"]
-    Z["SMT Verification (Z3)<br/>Reachability, termination, safe actions"]
+    G["JSON Policy<br/>Sensor contracts and safe actions"]
+    Z["Z3 SMT Verification<br/>Reachability, no dead ends, safe terminals"]
     B["Binary Builder<br/>Relative offsets, CRC32, source digest"]
     G --> Z --> B
   end
 
-  subgraph Banks["Dual Banks: Immutable, Zero-Copy Storage"]
+  subgraph Banks["2. Dual Static Banks: Immutable Policy Storage"]
     direction LR
-    A["Bank A"]
-    C["Bank B"]
+    A["Bank A<br/>Caller-owned storage"]
+    C["Bank B<br/>Caller-owned storage"]
   end
 
-  subgraph Runtime["Real-time Execution"]
+  subgraph Execute["3. Freestanding C99 Execution"]
     direction TB
-    S["Bank Selector<br/>Platform critical-section hooks"]
-    V["Wire Validation<br/>Format, bounds, payload CRC32"]
-    D{"Bounded DAG Traversal<br/>Sensor within contract?"}
-    F["Shadow Fallback<br/>Deterministic recovery edge"]
-    N["Normal Decision<br/>Threshold selects yes/no edge"]
-    O["Terminal Action"]
-    E["Structured Error<br/>Output unchanged"]
+    S["Validated Bank Publication<br/>Platform critical-section hooks"]
+    V["Wire Validation<br/>Header, CRC32, offsets, DAG structure"]
+    D{"Bounded Traversal<br/>Sensor within both contracts?"}
+    N["Normal Decision<br/>Threshold selects yes or no edge"]
+    E["Structured Rejection<br/>Action output unchanged"]
     S --> V
-    V -->|Valid blob| D
-    V -->|Rejected blob| E
+    V -->|Valid| D
+    V -->|Corrupt or malformed| E
     D -->|Yes| N
-    D -->|Outlier| F
-    N -->|Follow forward edges| O
-    F -->|Follow forward edges| O
+  end
+
+  subgraph Recovery["4. Shadow Fallback and Action Resolution"]
+    direction TB
+    F["Deterministic Shadow Edge<br/>Recover from sensor outliers"]
+    O["Terminal Action ID<br/>All traversed edges strictly advance"]
+    F -->|Bounded forward path| O
   end
 
   I["Unsigned Sensor Inputs"] --> D
@@ -46,7 +71,25 @@ flowchart TD
   B --> C
   A --> S
   C --> S
+  D -->|Out of bounds| F
+  N -->|Bounded forward path| O
 ```
+
+Banks are supplied by the application; they may reside in static RAM, flash, or
+another immutable readable region. The engine owns no allocator or storage pool.
+Shadow recovery is an explicit policy path, while malformed binaries return an
+error before policy execution.
+
+## Real-World Applications
+
+These are integration patterns for policies built and validated by the system
+owner, rather than claims of certified deployments or ready-made control logic.
+
+| Application | Policy examples | Integration requirement |
+|---|---|---|
+| **Autonomous Drones & Robotics** | Flight safety bounds, collision-avoidance action selection, and fallback behavior when a sensor exceeds its contract. | Define permitted actions and sensor ranges for the vehicle; validate complete sensing-to-actuation latency. |
+| **EV Battery Management** | Temperature-bound thermal-runaway interlocks and protective action selection targeting microsecond execution budgets. | Validate sensor response, contactor timing, and worst-case latency on the actual BMS hardware; the host benchmark establishes no thermal protection guarantee. |
+| **Aerospace & Defense** | Deterministic guidance fail-safes and bounded recovery policy selection. | Verify the guidance policy and platform integration against the application's assurance requirements; this release carries no aerospace certification. |
 
 ## Quickstart
 
